@@ -16,4 +16,5 @@ app.on('ready', () => {
    console.log(isDev);
    const urlLocation = isDev ? 'http://localhost:3000' : ''
    mainWin.loadURL(urlLocation)
+//    mainWin.webContents.openDevTools()
 })
