@@ -4,25 +4,42 @@ import FileSearch from "./components/FileSearch.js";
 import FileList from "./components/FileList.js";
 import BottomBtn from "./components/BottomBtn.js";
 import TabList from "./components/TabList.js";
-import defaultFiles from "./utils/defaultFiles.js";
 import SimpleMDE from 'react-simplemde-editor';
 import { v4  } from 'uuid';
 import { FlaternArr, ObjToArr } from "./utils/Helper.js";
 import "easymde/dist/easymde.min.css";
-import React, { useEffect } from 'react'
-import useKeyPress from './hooks/useKeyPress.js'
+import React, { useEffect } from 'react';
+import useKeyPress from './hooks/useKeyPress.js';
 import {
     faPlusSquare,
     faUpload
 } from '@fortawesome/free-solid-svg-icons'
 import { useState } from 'react';
-
+import FileHelper from './utils/FileHelper.js';
+const path = window.require('path');
+const remote = window.require('electron').remote;
+const Store = window.require('electron-store');
+const store = new Store({'name': 'File Data'});
+const basePath = remote.app.getPath('userData'); // basePath/notebook(项目名称)/File Data.json
+const saveFilesToStore = (files) =>{
+  const filesStoreObj = Object.values(files).reduce((result, file) => {
+      const { id, filePath, title, createAt } = file
+      result[id] = {
+        id,
+        filePath,
+        title,
+        createAt
+      }
+      return result
+    }, {})
+    store.set('files', filesStoreObj)
+}
 
 function App() {
-  const [files, setFiles] = useState({})
+  const [files, setFiles] = useState(store.get('files') || {}) //
   const [searchKeysword, setSearchKeysword] = useState('')
   const [searching, setSearching] = useState(false)
-  const [unSavedFiles, setUnSavedFiles] = useState([])
+  const [unSavedFiles, setUnSavedFiles] = useState({})
   const [activeFileId, setActiveFileId] = useState('')
   const [openedFileIds, setOpenedFileIds] = useState([])
   const [editingFileName, setEitingFileName] = useState(false)
@@ -48,21 +65,24 @@ function App() {
       ...files,
       [newFile.id]: newFile
     })
-    OpenFile(newFile.id)
+    // OpenFile(newFile.id)
   }
 
   // 2.delete file
   const DelFile = (id) => {
-    delete files[id]
-    setFiles(files)
-    // if active file,close it
+    FileHelper.removeFileSync(files[id].filePath)
+    const { [id]: delfile, ...resfiles } = files
     CloseFile(id)
+    setFiles(resfiles)
+    saveFilesToStore(resfiles)
+    // if active file,close it
+    
   }
 
 
   //3. add unsavefile  (change file but unsave)
   const UpdateOpenFile = (id, newValue) => {
-    const curFile = openedFilesArr.find(file => file.id === id)
+    const curFile = activeFile
     if (curFile.body === newValue) return
     const newFile = {
       ...curFile,
@@ -76,17 +96,32 @@ function App() {
 
   // 4. edit and save file
   const UpdateFile = (id, key, newValue) => {
-    //cant set same file name
-    if (key === 'title' && Object.values(files).find(file => file.id !== id && file[key] === newValue)) return alert('文件名已存在')
-    const newFile = {
+    let newFile = {
       ...files[id],
-      [key]: newValue,
       isNew: false
     }
-    setFiles({
+    if (key === 'title') {
+      const newPath = path.join(basePath, `${newValue}.md`)
+      newFile.title = newValue
+      newFile.filePath = newPath
+      const oldName = files[id].title
+      if(oldName) {
+        const oldPath = path.join(basePath, `${files[id].title}.md`)
+        FileHelper.renameSync(oldPath, newPath)
+      } else {
+        // 新建的文件
+        FileHelper.writeFileSync(newFile.filePath, newFile.body)
+      }
+    } else {
+      // body
+      FileHelper.writeFileSync(newFile.filePath, newValue)
+    }
+    const newfiles = {
       ...files,
       [id]: newFile
-    })
+    }
+    setFiles(newfiles)
+    if (key === 'title') saveFilesToStore(newfiles)
   }
 
   //5.save file   (while activefile is unsave, 'ctrl+s' to save it)
@@ -95,12 +130,16 @@ function App() {
   useEffect(() => {
     if (ctrlPressed && sPressed && activeFileId && unSavedFiles[activeFileId]) {
       const body = unSavedFiles[activeFileId].body
-      delete unSavedFiles[activeFileId]
-      setUnSavedFiles(unSavedFiles)
+
+      const {
+        [activeFileId]: delFile,
+        ...resUnsavedFiles
+      } = unSavedFiles
+      setUnSavedFiles(resUnsavedFiles)
       UpdateFile(activeFileId, 'body', body)
     }
   })
-
+  
   // 6.open file
   const OpenFile = (id) => {
     //add to openfiles
@@ -117,7 +156,7 @@ function App() {
     const newOpenedFileIds = openedFileIds.filter(item => item !== id)
     setOpenedFileIds(newOpenedFileIds)
     //if change active file
-    if (id === activeFileId) setActiveFileId(openedFileIds[0] || '')
+    if (id === activeFileId) setActiveFileId(openedFileIds.length > 1 ? openedFileIds[0] : '')
   }
 
   // 8.change active file  (tab click)
@@ -130,20 +169,30 @@ function App() {
   const searchFile = (keywords = '') => {
     setSearchKeysword(keywords)
   }
-
+  const getActFile = (id) => {
+     const actFile = unSavedFiles[activeFileId] || files[activeFileId] || null
+     if (!actFile) return
+     if (actFile.isLoaded) return actFile
+     const body = actFile.filePath ? FileHelper.readFileSync(actFile.filePath) : ''
+    //  console.log('body',body);
+     return {
+       ...actFile,
+       body,
+       isLoaded: true
+     }
+  }
   // left filelist
   const filesArr = ObjToArr(files).filter(file => {
     return file.title.includes(searchKeysword)
   })
-  console.log('filesArr',filesArr);
+  
   // openedFilesArr base unsaveFiles or files
   const openedFilesArr = openedFileIds.map(id => unSavedFiles[id] || files[id])
   // activeFile base unsaveFiles or files
-  const activeFile = unSavedFiles[activeFileId] || files[activeFileId] || null
+  const activeFile = getActFile(activeFileId) //unSavedFiles[activeFileId] || files[activeFileId] || null
   const unSavedFileIds = Object.keys(unSavedFiles)
 
-  console.log('openedFilesArr:', openedFilesArr);
-  
+  console.log('activeFile', activeFile);
   return (
     <div className="App container-fluid px-0">
       <div className="row no-gutters">

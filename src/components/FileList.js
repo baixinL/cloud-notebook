@@ -20,6 +20,11 @@ const FileList = ({
         setEditStatic(false)
         setValue('')
     }
+    const ifCanChangeFileName = () => {
+        if (files.find(file => file.id === value)) return alert('文件名已存在')
+        onFileNameSaveEdit(editStatic, 'title', value)
+        closeChangeName()
+    }
     const setChangeEdit = (id, title) => {
         if (!editStatic) {
             setEditStatic(id)
@@ -29,13 +34,12 @@ const FileList = ({
         }
     }
     
+    
     useEffect(() => {
-        console.log(enterPressed);
         if (enterPressed && editStatic && value) {
-            onFileNameSaveEdit(editStatic, 'title', value)
-            closeChangeName()
+            ifCanChangeFileName()
         }
-    })
+    }, [enterPressed])
 
     //进入文件名编辑时，需要通知上一级
     useEffect(() => {
@@ -117,10 +121,9 @@ const FileList = ({
                                         type="button"
                                         className="icon-button col-1"
                                         onClick = {
-                                            (e) => {
+                                            () => {
                                                 if (value) {
-                                                    onFileNameSaveEdit(editStatic, 'title', value);
-                                                    closeChangeName(e);
+                                                    ifCanChangeFileName()
                                                 }
                                             }
                                         }

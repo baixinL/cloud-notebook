@@ -23,10 +23,10 @@ const FileSearch =  ({ title, onFileSearch, searchStateChange }) => {
     }
     useEffect(()=>{
         if (enterPressed && inputActive) onFileSearch(value)
-    })
+    }, [enterPressed])
     useEffect(() => {
         if (escPressed && inputActive) closeSearch()
-    })
+    }, [escPressed])
     return (
         < div className = "alert alert-primary d-flex justify-content-between align-items-center search-wrap mb-0">
             {
