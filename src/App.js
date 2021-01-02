@@ -1,24 +1,25 @@
 import './App.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
+import SimpleMDE from 'react-simplemde-editor';
+import { v4  } from 'uuid';
+import {
+  faPlusSquare,
+  faUpload
+} from '@fortawesome/free-solid-svg-icons';
+import "easymde/dist/easymde.min.css";
+import React, { useEffect,useState } from 'react';
+import PropTypes from 'prop-types';
 import FileSearch from "./components/FileSearch.js";
 import FileList from "./components/FileList.js";
 import BottomBtn from "./components/BottomBtn.js";
 import TabList from "./components/TabList.js";
-import SimpleMDE from 'react-simplemde-editor';
-import { v4  } from 'uuid';
+import FileHelper from './utils/FileHelper.js';
 import {
   ObjToArr,
   returnTimes
 } from "./utils/Helper.js";
-import "easymde/dist/easymde.min.css";
-import React, { useEffect } from 'react';
 import useKeyPress from './hooks/useKeyPress.js';
-import {
-    faPlusSquare,
-    faUpload
-} from '@fortawesome/free-solid-svg-icons'
-import { useState } from 'react';
-import FileHelper from './utils/FileHelper.js';
+
 const path = window.require('path');
 const remote = window.require('electron').remote;
 const Store = window.require('electron-store');
@@ -37,7 +38,6 @@ const saveFilesToStore = (files) =>{
     }, {})
     store.set('files', filesStoreObj)
 }
-
 
 
 function App() {
@@ -87,7 +87,7 @@ function App() {
     // if active file,close it
     
   }
-  // remove file from list
+  // 3.remove file from list
   const RemoveFile = (id) => {
     const {
       [id]: delfile, ...resfiles
@@ -99,7 +99,7 @@ function App() {
   }
 
 
-  //3. add unsavefile  (change file but unsave)
+  //4. add unsavefile  (change file but unsave)
   const UpdateOpenFile = (id, newValue) => {
     const curFile = activeFile
     if (curFile.body === newValue) return
@@ -113,7 +113,7 @@ function App() {
     })
   }
 
-  // 4. edit and save file
+  // 5. edit and save file
   const UpdateFile = (id, key, newValue) => {
     try {
       let newFile = {
@@ -121,11 +121,13 @@ function App() {
         isNew: false
       }
       if (key === 'title') {
-        if (files[id].title == newValue) return // 没改
-        const newPath = path.join(basePath, `${newValue}.md`)
+        if (files[id].title === newValue) return // 没改
         const oldPath = newFile.filePath
+        const newPath = oldPath ? path.join(path.dirname(oldPath), `${newValue}.md`) : path.join(basePath, `${newValue}.md`)
+        
         newFile.filePath = newPath
         newFile.title = newValue
+
         const oldName = files[id].title
         if(oldName) {
           FileHelper.renameSync(oldPath, newPath)
@@ -148,13 +150,12 @@ function App() {
     }
   }
 
-  //5.save file   (while activefile is unsave, 'ctrl+s' to save it)
+  //6.save file   (while activefile is unsave, 'ctrl+s' to save it)
   const ctrlPressed = useKeyPress(17)
   const sPressed = useKeyPress(83)
   useEffect(() => {
     if (ctrlPressed && sPressed && activeFileId && unSavedFiles[activeFileId]) {
       const body = unSavedFiles[activeFileId].body
-
       const {
         [activeFileId]: delFile,
         ...resUnsavedFiles
@@ -162,9 +163,9 @@ function App() {
       setUnSavedFiles(resUnsavedFiles)
       UpdateFile(activeFileId, 'body', body)
     }
-  })
+  }, [ctrlPressed, sPressed])
   
-  // 6.open file
+  // 7.open file
   const OpenFile = (id) => {
     //add to openfiles
     if (!openedFileIds.includes(id)) {
@@ -174,22 +175,23 @@ function App() {
     setActiveFileId(id)
   }
 
-  // 7.close file
+  // 8.close file
   const CloseFile = (id) => {
+    //if change active file
+    if (id === activeFileId) setActiveFileId(openedFileIds.length > 1 ? openedFileIds[0] : '')
     // remove from openfiles
     const newOpenedFileIds = openedFileIds.filter(item => item !== id)
     setOpenedFileIds(newOpenedFileIds)
-    //if change active file
-    if (id === activeFileId) setActiveFileId(openedFileIds.length > 1 ? openedFileIds[0] : '')
+    
   }
 
-  // 8.change active file  (tab click)
+  // 9.change active file  (tab click)
   const ChangeTabActiveFile = (id) => {
     //if change active file
     if (id !== activeFileId) setActiveFileId(id)
   }
 
-  //9. search File
+  //10. search File
   const searchFile = (keywords = '') => {
     setSearchKeysword(keywords)
   }
@@ -197,23 +199,23 @@ function App() {
      const actFile = unSavedFiles[activeFileId] || files[activeFileId] || null
      if (!actFile) return
      if (actFile.isLoaded) return actFile
-     let body = ''
-     if (actFile.filePath) {
-       try {
-         body = FileHelper.readFileSync(actFile.filePath)
-       } catch (error) {
-         alert(error)
-         RemoveFile(id)
-       }
-     }
-    //  console.log('body',body);
-     return {
-       ...actFile,
-       body,
-       isLoaded: true
+
+     try {
+      let body = ''
+      if (actFile.filePath) {
+          body = FileHelper.readFileSync(actFile.filePath)
+      }
+      return {
+        ...actFile,
+        body,
+        isLoaded: true
+      }
+     } catch (error) {
+      //  注意：window.confirm弹框需要确认2次yes才算yes
+      if (window.confirm(`{\n${error}\n}\n\n确定将此文件移出Markdown文件列表？`)) RemoveFile(id)
      }
   }
-  // 10.导入文件
+  // 11.导入文件
   const importFiles = () => {
     remote.dialog.showOpenDialog({
       title:'选择导入的 Markdown 文件', //String(可选) - 对话框窗口的标题
@@ -225,7 +227,6 @@ function App() {
       }], //FileFilter[](可选)
       properties: ['openFile', 'multiSelections']
     }).then(res=>{
-      console.log(res);
       //点击了确认导入
       if (!res.canceled) {
         const importResFiles = res.filePaths
@@ -250,12 +251,10 @@ function App() {
           result[nfile.id] = nfile
           return result
         },{})
-        console.log('impFiles', impFiles);
         const newfiles = {
           ...files,
           ...impFiles
         }
-        console.log('newfiles', newfiles);
         setFiles(newfiles)
         saveFilesToStore(newfiles)
       }
@@ -264,19 +263,18 @@ function App() {
       alert(err)
     })
   }
-
+  console.log('do');
   // left filelist
   const filesArr = ObjToArr(files).filter(file => {
     return file.title.includes(searchKeysword)
   })
-  
+  // activeFile base unsaveFiles or files
+  let activeFile = getActFile(activeFileId)
+  // get unsavefile ids
+  const unSavedFileIds = Object.keys(unSavedFiles)
   // openedFilesArr base unsaveFiles or files
   const openedFilesArr = openedFileIds.map(id => unSavedFiles[id] || files[id])
-  // activeFile base unsaveFiles or files
-  const activeFile = getActFile(activeFileId) //unSavedFiles[activeFileId] || files[activeFileId] || null
-  const unSavedFileIds = Object.keys(unSavedFiles)
-
-  console.log('activeFile', activeFile);
+  
   return (
     <div className="App container-fluid px-0">
       <div className="row no-gutters">
@@ -366,6 +364,15 @@ function App() {
       </div>
     </div>
   );
+}
+App.propTypes = {
+  files: PropTypes.object,
+  searchKeysword: PropTypes.string,
+  searching: PropTypes.bool,
+  unSavedFiles: PropTypes.object,
+  activeFileId: PropTypes.string,
+  openedFileIds: PropTypes.array,
+  editingFileName: PropTypes.bool,
 }
 
 export default App;
