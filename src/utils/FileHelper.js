@@ -2,8 +2,13 @@ const {
     writeFileSync,
     readFileSync,
     unlinkSync,
-    renameSync
+    renameSync,
+    readdirSync
 } = window.require('fs')
+const {
+    dirname,
+    basename
+} = window.require('path')
 
 const FileHelper = {
     // write data in file
@@ -16,6 +21,12 @@ const FileHelper = {
     },
     // change filename
     renameSync: (oldPath, newPath) => {
+        const newPathDir = dirname(newPath)
+        const newPathBaseName = basename(newPath)
+        const newPathDirFileList = readdirSync(newPathDir)
+        console.log('newPathDirFileList:', newPathDirFileList);
+        const ifHadSameNameFile = newPathDirFileList.find(filePath => basename(filePath) === newPathBaseName)
+        if (ifHadSameNameFile) throw new Error('目标目录下已存在同名文件！')
         return renameSync(oldPath, newPath)
     },
     // delete file

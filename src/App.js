@@ -6,7 +6,10 @@ import BottomBtn from "./components/BottomBtn.js";
 import TabList from "./components/TabList.js";
 import SimpleMDE from 'react-simplemde-editor';
 import { v4  } from 'uuid';
-import { FlaternArr, ObjToArr } from "./utils/Helper.js";
+import {
+  ObjToArr,
+  returnTimes
+} from "./utils/Helper.js";
 import "easymde/dist/easymde.min.css";
 import React, { useEffect } from 'react';
 import useKeyPress from './hooks/useKeyPress.js';
@@ -34,6 +37,8 @@ const saveFilesToStore = (files) =>{
     }, {})
     store.set('files', filesStoreObj)
 }
+
+
 
 function App() {
   const [files, setFiles] = useState(store.get('files') || {}) //
@@ -70,13 +75,27 @@ function App() {
 
   // 2.delete file
   const DelFile = (id) => {
-    FileHelper.removeFileSync(files[id].filePath)
+    try {
+      FileHelper.removeFileSync(files[id].filePath)
+    } catch (error) {
+      alert(error)
+    }
     const { [id]: delfile, ...resfiles } = files
     CloseFile(id)
     setFiles(resfiles)
     saveFilesToStore(resfiles)
     // if active file,close it
     
+  }
+  // remove file from list
+  const RemoveFile = (id) => {
+    const {
+      [id]: delfile, ...resfiles
+    } = files
+    CloseFile(id)
+    setFiles(resfiles)
+    saveFilesToStore(resfiles)
+    // if active file,close it
   }
 
 
@@ -96,32 +115,37 @@ function App() {
 
   // 4. edit and save file
   const UpdateFile = (id, key, newValue) => {
-    let newFile = {
-      ...files[id],
-      isNew: false
-    }
-    if (key === 'title') {
-      const newPath = path.join(basePath, `${newValue}.md`)
-      newFile.title = newValue
-      newFile.filePath = newPath
-      const oldName = files[id].title
-      if(oldName) {
-        const oldPath = path.join(basePath, `${files[id].title}.md`)
-        FileHelper.renameSync(oldPath, newPath)
-      } else {
-        // 新建的文件
-        FileHelper.writeFileSync(newFile.filePath, newFile.body)
+    try {
+      let newFile = {
+        ...files[id],
+        isNew: false
       }
-    } else {
-      // body
-      FileHelper.writeFileSync(newFile.filePath, newValue)
+      if (key === 'title') {
+        if (files[id].title == newValue) return // 没改
+        const newPath = path.join(basePath, `${newValue}.md`)
+        const oldPath = newFile.filePath
+        newFile.filePath = newPath
+        newFile.title = newValue
+        const oldName = files[id].title
+        if(oldName) {
+          FileHelper.renameSync(oldPath, newPath)
+        } else {
+          // 新建的文件
+          FileHelper.writeFileSync(newFile.filePath, newFile.body)
+        }
+      } else {
+        // body
+        FileHelper.writeFileSync(newFile.filePath, newValue)
+      }
+      const newfiles = {
+        ...files,
+        [id]: newFile
+      }
+      setFiles(newfiles)
+      if (key === 'title') saveFilesToStore(newfiles)
+    } catch (error) {
+      alert(error)
     }
-    const newfiles = {
-      ...files,
-      [id]: newFile
-    }
-    setFiles(newfiles)
-    if (key === 'title') saveFilesToStore(newfiles)
   }
 
   //5.save file   (while activefile is unsave, 'ctrl+s' to save it)
@@ -173,7 +197,15 @@ function App() {
      const actFile = unSavedFiles[activeFileId] || files[activeFileId] || null
      if (!actFile) return
      if (actFile.isLoaded) return actFile
-     const body = actFile.filePath ? FileHelper.readFileSync(actFile.filePath) : ''
+     let body = ''
+     if (actFile.filePath) {
+       try {
+         body = FileHelper.readFileSync(actFile.filePath)
+       } catch (error) {
+         alert(error)
+         RemoveFile(id)
+       }
+     }
     //  console.log('body',body);
      return {
        ...actFile,
@@ -181,6 +213,58 @@ function App() {
        isLoaded: true
      }
   }
+  // 10.导入文件
+  const importFiles = () => {
+    remote.dialog.showOpenDialog({
+      title:'选择导入的 Markdown 文件', //String(可选) - 对话框窗口的标题
+      //defaultPath: //String(可选) - 对话框的默认展示路径
+      buttonLabel:'导入', //String(可选) - 「确认」 按钮的自定义标签, 当为空时, 将使用默认标签。
+      filters: [{
+        name: 'Markdown Files',
+        extensions: ['md']
+      }], //FileFilter[](可选)
+      properties: ['openFile', 'multiSelections']
+    }).then(res=>{
+      console.log(res);
+      //点击了确认导入
+      if (!res.canceled) {
+        const importResFiles = res.filePaths
+        const isSameName = (title) => {
+          return !!Object.values(files).find((file) => {
+            return file.title === title
+          })
+        }
+        let impFiles = importResFiles.reduce((result, filePath) => {
+          const title = path.basename(filePath, '.md')
+          if(isSameName(title)) throw new Error(`已存在同名文件${title}`)
+          // if (isSameName(title)) {
+          //   alert(`已存在同名文件${title}`)
+          //   return
+          // }
+          const nfile = {
+            id: v4(),
+            title,
+            filePath,
+            createAt: returnTimes()
+          }
+          result[nfile.id] = nfile
+          return result
+        },{})
+        console.log('impFiles', impFiles);
+        const newfiles = {
+          ...files,
+          ...impFiles
+        }
+        console.log('newfiles', newfiles);
+        setFiles(newfiles)
+        saveFilesToStore(newfiles)
+      }
+    }).catch(err=>{
+      // console.error(err);
+      alert(err)
+    })
+  }
+
   // left filelist
   const filesArr = ObjToArr(files).filter(file => {
     return file.title.includes(searchKeysword)
@@ -203,8 +287,16 @@ function App() {
               files={filesArr}
               onFileClickFunc={OpenFile}
               onFileNameSaveEdit = {UpdateFile}
+              onFileRemoveFunc = {
+                (id) => {
+                  const res = window.confirm("确认此文件移出Markdown文件列表？")
+                  if (res) {
+                    RemoveFile(id)
+                  }
+                }
+              }
               onFileDeleteFunc={(id)=>{
-                const res = window.confirm("确认此删除文件？")
+                const res = window.confirm("确认将此文件从文件资源管理器中删除？")
                 if (res) {
                   DelFile(id)
                 }
@@ -232,7 +324,11 @@ function App() {
                     text="导入"
                     icon={faUpload}
                     colorClass="btn-success"
-                    onBtnClick={()=>{console.log('click导入')}}
+                    onBtnClick = {
+                      () => {
+                        importFiles()
+                      }
+                    }
                     />
                 </div>
               </div>

@@ -8,3 +8,6 @@ export const FlaternArr = (arr, key = 'id') => {
 export const ObjToArr = (obj) => {
     return Object.keys(obj).map(key => obj[key]) || []
 }
+export const returnTimes = ()=> {
+    return (new Date()).getTime()
+}

@@ -1,6 +1,12 @@
 import React, { useState,useEffect, useRef } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faEdit, faTrash, faTimes, faSave } from '@fortawesome/free-solid-svg-icons'
+import {
+    faEdit,
+    faTrash,
+    faTimes,
+    faSave,
+    faMinus
+} from '@fortawesome/free-solid-svg-icons'
 import { faMarkdown } from '@fortawesome/free-brands-svg-icons'
 import useKeyPress from './../hooks/useKeyPress.js'
 import PropTypes from 'prop-types'
@@ -9,6 +15,7 @@ const FileList = ({
         files,
         onFileClickFunc,
         onFileDeleteFunc,
+        onFileRemoveFunc,
         onFileNameSaveEdit,
         onFileNameEditStart
     }) => {
@@ -21,7 +28,7 @@ const FileList = ({
         setValue('')
     }
     const ifCanChangeFileName = () => {
-        if (files.find(file => file.id === value)) return alert('文件名已存在')
+        if (files.find(file => file.id !== editStatic && file.title === value)) return alert('当前文件列表中已存在同名文件！')
         onFileNameSaveEdit(editStatic, 'title', value)
         closeChangeName()
     }
@@ -73,8 +80,9 @@ const FileList = ({
                                         />
                                     </span>
                                     <span
-                                        className="col"
+                                        className="col file-name"
                                         onClick={() => { onFileClickFunc(file.id) }}
+                                        title={file.title}
                                     >
                                         {file.title}
                                     </span>
@@ -86,6 +94,17 @@ const FileList = ({
                                         <FontAwesomeIcon
                                             title="编辑"
                                             icon={faEdit}
+                                            size="lg"
+                                        />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="icon-button col-1"
+                                        onClick={(e) => { onFileRemoveFunc(file.id) }}
+                                    >
+                                        <FontAwesomeIcon
+                                            title="移出文件列表"
+                                            icon={faMinus}
                                             size="lg"
                                         />
                                     </button>
@@ -146,6 +165,7 @@ FileList.propTypes = {
     files: PropTypes.array,
     onFileClickFunc: PropTypes.func,
     onFileDeleteFunc: PropTypes.func,
+    onFileRemoveFunc: PropTypes.func,
     onFileNameSaveEdit: PropTypes.func
 }
 export default FileList
