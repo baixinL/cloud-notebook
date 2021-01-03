@@ -144,7 +144,21 @@ function App() {
         [id]: newFile
       }
       setFiles(newfiles)
-      if (key === 'title') saveFilesToStore(newfiles)
+      if (key === 'title') {
+        saveFilesToStore(newfiles)
+        // 未保存文件被更改名称，需要更新未保存文件信息
+        if (Object.keys(unSavedFiles).includes(id)) {
+          const curFileInUnSaveFiles = {
+            ...newFile,
+            body: unSavedFiles[id].body // 内容未保存
+          }
+          const newUnSavedFiles = {
+            ...unSavedFiles,
+            [id]: curFileInUnSaveFiles
+          }
+          setUnSavedFiles(newUnSavedFiles)
+        }
+      }
     } catch (error) {
       alert(error)
     }
@@ -163,7 +177,7 @@ function App() {
       setUnSavedFiles(resUnsavedFiles)
       UpdateFile(activeFileId, 'body', body)
     }
-  }, [ctrlPressed, sPressed])
+  }, [ctrlPressed, sPressed, activeFileId, unSavedFiles])
   
   // 7.open file
   const OpenFile = (id) => {
@@ -177,11 +191,30 @@ function App() {
 
   // 8.close file
   const CloseFile = (id) => {
-    //if change active file
-    if (id === activeFileId) setActiveFileId(openedFileIds.length > 1 ? openedFileIds[0] : '')
+    // if unsave
+    if(unSavedFileIds.includes(id)) {
+      const answer = window.confirm(`是否要保存文件${unSavedFiles[id].title}？`)
+      // remove from unsavefiles
+      const {
+        [id]: delFile,
+        ...resUnsavedFiles
+      } = unSavedFiles
+      setUnSavedFiles(resUnsavedFiles)
+      // save, updatefile
+      if (answer) {
+         const body = unSavedFiles[id].body
+         UpdateFile(id, 'body', body)
+      }
+    }
+    
     // remove from openfiles
-    const newOpenedFileIds = openedFileIds.filter(item => item !== id)
-    setOpenedFileIds(newOpenedFileIds)
+    if (openedFileIds.includes(id)) {
+      const resOpenFilesIds = openedFileIds.filter(item => item !== id)
+      setOpenedFileIds(resOpenFilesIds)
+
+      //if change active file
+      if (id === activeFileId) setActiveFileId(resOpenFilesIds.length > 0 ? resOpenFilesIds[0] : '')
+    }
     
   }
 
@@ -203,7 +236,8 @@ function App() {
      try {
       let body = ''
       if (actFile.filePath) {
-          body = FileHelper.readFileSync(actFile.filePath)
+        // 如果是未保存的文件需要从unsavefiles中读取body,已保存的从文件系统读取
+          body = actFile.body || FileHelper.readFileSync(actFile.filePath)
       }
       return {
         ...actFile,
@@ -272,8 +306,8 @@ function App() {
   let activeFile = getActFile(activeFileId)
   // get unsavefile ids
   const unSavedFileIds = Object.keys(unSavedFiles)
-  // openedFilesArr base unsaveFiles or files
-  const openedFilesArr = openedFileIds.map(id => unSavedFiles[id] || files[id])
+  // openedFilesArr base unsaveFiles or files,filter过滤因为files先更新，openedFileIds未更新导致的错误
+  const openedFilesArr = openedFileIds.map(id => unSavedFiles[id] || files[id]).filter(file => file)
   
   return (
     <div className="App container-fluid px-0">
@@ -283,6 +317,7 @@ function App() {
           <div className="flex-grow-1 overflow-auto">
             <FileList
               files={filesArr}
+              openedFileIds={openedFileIds}
               onFileClickFunc={OpenFile}
               onFileNameSaveEdit = {UpdateFile}
               onFileRemoveFunc = {

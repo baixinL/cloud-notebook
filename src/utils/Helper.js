@@ -11,3 +11,12 @@ export const ObjToArr = (obj) => {
 export const returnTimes = ()=> {
     return (new Date()).getTime()
 }
+
+export const getParentNode = (node, parentClass) => {
+    let cur = node
+    while(cur!==null) {
+        if (cur.classList&&cur.classList.contains(parentClass)) return cur
+        cur = cur.parentNode
+    }
+    return
+}

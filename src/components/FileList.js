@@ -1,18 +1,20 @@
-import React, { useState,useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
-    faEdit,
-    faTrash,
     faTimes,
-    faSave,
-    faMinus
+    faSave
 } from '@fortawesome/free-solid-svg-icons'
 import { faMarkdown } from '@fortawesome/free-brands-svg-icons'
 import useKeyPress from './../hooks/useKeyPress.js'
 import PropTypes from 'prop-types'
 
+import useContextMenu from './../hooks/useContextMenu.js'
+import {
+    getParentNode
+} from "./../utils/Helper.js";
 const FileList = ({
         files,
+        openedFileIds,
         onFileClickFunc,
         onFileDeleteFunc,
         onFileRemoveFunc,
@@ -40,8 +42,47 @@ const FileList = ({
             alert('已有文件名编辑中，请关闭后再试')
         }
     }
-    
-    
+    const clickNode = useContextMenu([
+        {
+            label: '打开',
+            click: () => {
+                const target = getParentNode(clickNode.current, 'file-item')
+                if (!target) return
+                const id = target.dataset.id
+                onFileClickFunc(id)
+            }
+        },
+        {
+            label: '从文件资源管理器中删除',
+            click: () => {
+                const target = getParentNode(clickNode.current, 'file-item')
+                if (!target) return
+                const id = target.dataset.id
+                onFileDeleteFunc(id)
+            }
+        },
+        {
+            label: '从Markdown文件列表中移除',
+            click: () => {
+                const target = getParentNode(clickNode.current, 'file-item')
+                if (!target) return
+                const id = target.dataset.id
+                onFileRemoveFunc(id)
+            }
+        },
+        {
+            label: '重命名',
+            click: () => {
+                const target = getParentNode(clickNode.current, 'file-item')
+                if (!target) return
+                const id = target.dataset.id
+                const title = target.dataset.title
+                setChangeEdit(id, title)
+            }
+        }
+    ], '.file-list')
+    // console.log('clickNode', clickNode);
+
     useEffect(() => {
         if (enterPressed && editStatic && value) {
             ifCanChangeFileName()
@@ -68,6 +109,8 @@ const FileList = ({
                         <li
                             className="list-group-item d-flex align-item-center file-item"
                             key={file.id}
+                            data-id={file.id}
+                            data-title={file.title}
                         >
                             {
                                 (file.id !== editStatic && !file.isNew) &&
@@ -86,35 +129,6 @@ const FileList = ({
                                     >
                                         {file.title}
                                     </span>
-                                    <button
-                                        type="button"
-                                        className="icon-button col-1"
-                                        onClick={() => { setChangeEdit(file.id, file.title)}}
-                                    >
-                                        <FontAwesomeIcon
-                                            title="编辑"
-                                            icon={faEdit}
-                                            size="lg"
-                                        />
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="icon-button col-1"
-                                        onClick={(e) => { onFileRemoveFunc(file.id) }}
-                                    >
-                                        <FontAwesomeIcon
-                                            title="移出文件列表"
-                                            icon={faMinus}
-                                            size="lg"
-                                        />
-                                    </button>
-                                    <button type="button" className="icon-button col-1" onClick={() => { onFileDeleteFunc(file.id) }}>
-                                        <FontAwesomeIcon
-                                            title="删除"
-                                            icon={faTrash}
-                                            size="lg"
-                                        />
-                                    </button>
                                 </>
                             }
                             {

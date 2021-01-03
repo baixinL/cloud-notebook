@@ -19,6 +19,8 @@ const TabList = ({
         <ul className="nav nav-pills">
             {
                 files.map(file => {
+                    // console.log('file:',file);
+                    if (!file) return
                     const unSave = unSavedIds && unSavedIds.indexOf(file.id) > -1;
                     const fclassNames = classNames({
                         'nav-link': true,
@@ -36,7 +38,7 @@ const TabList = ({
                                 }}
                             >
                                 {file.title || '[文件名]'}
-                                < span className="mx-1 tab-btn-close">
+                                <span className="mx-1 tab-btn-close">
                                     <FontAwesomeIcon
                                         title="关闭"
                                         icon={faTimes}
