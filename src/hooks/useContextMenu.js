@@ -11,7 +11,7 @@ const useContextMenu = (itemArr, targetSelector, deps) => {
             menu.append(new MenuItem(item))
         })
         const handler = (e) => {
-            // 区域限定
+            // 区域限定；e.targets是否时document.querySelector(targetSelector)的子节点
             if (document.querySelector(targetSelector).contains(e.target)) {
                 clickedNode.current = e.target
                 e.preventDefault()

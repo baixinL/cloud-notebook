@@ -1,8 +1,10 @@
 const {
     app,
+    Menu,
     BrowserWindow
 } = require("electron")
 const isDev = require('electron-is-dev')
+const { template } = require('./src/utils/systemMenuTemplate')
 let mainWin;
 
 app.on('ready', () => {
@@ -18,4 +20,6 @@ app.on('ready', () => {
    const urlLocation = isDev ? 'http://localhost:3000' : ''
    mainWin.loadURL(urlLocation)
 //    mainWin.webContents.openDevTools()
+    const menu = Menu.buildFromTemplate(template)
+    Menu.setApplicationMenu(menu)
 })
