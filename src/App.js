@@ -14,17 +14,23 @@ import FileList from "./components/FileList.js";
 import BottomBtn from "./components/BottomBtn.js";
 import TabList from "./components/TabList.js";
 import FileHelper from './utils/FileHelper.js';
+import useIpcRenderer from './hooks/useIpcRenderer.js';
 import {
   ObjToArr,
   returnTimes
 } from "./utils/Helper.js";
-import useKeyPress from './hooks/useKeyPress.js';
 
 const path = window.require('path');
-const remote = window.require('electron').remote;
+const {
+  remote,
+} = window.require('electron')
+const {
+  app,
+  dialog,
+} = remote
 const Store = window.require('electron-store');
 const store = new Store({'name': 'File Data'});
-const basePath = remote.app.getPath('userData'); // basePath/notebook(项目名称)/File Data.json
+const basePath = app.getPath('userData'); // basePath/notebook(项目名称)/File Data.json
 const saveFilesToStore = (files) =>{
   const filesStoreObj = Object.values(files).reduce((result, file) => {
       const { id, filePath, title, createAt } = file
@@ -100,7 +106,7 @@ function App() {
 
 
   //4. add unsavefile  (change file but unsave)
-  const UpdateOpenFile = (id, newValue) => {
+  const UpdateUnsaveFile = (id, newValue) => {
     const curFile = activeFile
     if (curFile.body === newValue) return
     const newFile = {
@@ -137,6 +143,7 @@ function App() {
         }
       } else {
         // body
+        if (files[id].body === newValue) return // 没改
         FileHelper.writeFileSync(newFile.filePath, newValue)
       }
       const newfiles = {
@@ -163,21 +170,19 @@ function App() {
       alert(error)
     }
   }
-
-  //6.save file   (while activefile is unsave, 'ctrl+s' to save it)
-  const ctrlPressed = useKeyPress(17)
-  const sPressed = useKeyPress(83)
-  useEffect(() => {
-    if (ctrlPressed && sPressed && activeFileId && unSavedFiles[activeFileId]) {
-      const body = unSavedFiles[activeFileId].body
-      const {
-        [activeFileId]: delFile,
-        ...resUnsavedFiles
-      } = unSavedFiles
-      setUnSavedFiles(resUnsavedFiles)
-      UpdateFile(activeFileId, 'body', body)
-    }
-  }, [ctrlPressed, sPressed, activeFileId, unSavedFiles])
+  
+  //6.save file 
+ const SaveFile = () => {
+   console.log('save');
+   if (!unSavedFiles[activeFileId]) return
+   const body = unSavedFiles[activeFileId].body
+   const {
+     [activeFileId]: delFile,
+     ...resUnsavedFiles
+   } = unSavedFiles
+   setUnSavedFiles(resUnsavedFiles)
+   UpdateFile(activeFileId, 'body', body)
+ }
   
   // 7.open file
   const OpenFile = (id) => {
@@ -225,7 +230,8 @@ function App() {
   }
 
   //10. search File
-  const searchFile = (keywords = '') => {
+  const SearchFile = (keywords = '') => {
+    console.log('SearchFile', keywords);
     setSearchKeysword(keywords)
   }
   const getActFile = (id) => {
@@ -250,8 +256,8 @@ function App() {
      }
   }
   // 11.导入文件
-  const importFiles = () => {
-    remote.dialog.showOpenDialog({
+  const ImportFiles = () => {
+    dialog.showOpenDialog({
       title:'选择导入的 Markdown 文件', //String(可选) - 对话框窗口的标题
       //defaultPath: //String(可选) - 对话框的默认展示路径
       buttonLabel:'导入', //String(可选) - 「确认」 按钮的自定义标签, 当为空时, 将使用默认标签。
@@ -297,7 +303,7 @@ function App() {
       alert(err)
     })
   }
-  console.log('do');
+  // console.log('do');
   // left filelist
   const filesArr = ObjToArr(files).filter(file => {
     return file.title.includes(searchKeysword)
@@ -309,11 +315,19 @@ function App() {
   // openedFilesArr base unsaveFiles or files,filter过滤因为files先更新，openedFileIds未更新导致的错误
   const openedFilesArr = openedFileIds.map(id => unSavedFiles[id] || files[id]).filter(file => file)
   
+
+  // 系统菜单快捷键监听
+  useIpcRenderer({
+    'create-new-file': CreateFile,
+    'create-import-file': ImportFiles,
+    'create-saved-file': SaveFile
+  })
+
   return (
-    <div className="App container-fluid px-0">
+    <div className="Apdp container-fluid px-0">
       <div className="row no-gutters">
         <div className = "col-3 d-flex flex-column left-panel">
-          <FileSearch onFileSearch={searchFile} searchStateChange={(flag)=>{setSearching(flag)}} />
+          <FileSearch onFileSearch={SearchFile} searchStateChange={(flag)=>{setSearching(flag)}} />
           <div className="flex-grow-1 overflow-auto">
             <FileList
               files={filesArr}
@@ -359,7 +373,7 @@ function App() {
                     colorClass="btn-success"
                     onBtnClick = {
                       () => {
-                        importFiles()
+                        ImportFiles()
                       }
                     }
                     />
@@ -389,7 +403,7 @@ function App() {
               }}
               onChange = {
                 (value) => {
-                  UpdateOpenFile(activeFileId, value)
+                  UpdateUnsaveFile(activeFileId, value)
                 }
               }
               />

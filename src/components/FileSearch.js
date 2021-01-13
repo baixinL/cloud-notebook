@@ -2,6 +2,7 @@ import React, { useState,useEffect, useRef } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faSearch, faTimes } from '@fortawesome/free-solid-svg-icons'
 import useKeyPress from './../hooks/useKeyPress.js'
+import useIpcRenderer from './../hooks/useIpcRenderer.js';
 import PropTypes from 'prop-types'
 const FileSearch =  ({ title, onFileSearch, searchStateChange }) => {
     const enterPressed = useKeyPress(13)
@@ -9,13 +10,19 @@ const FileSearch =  ({ title, onFileSearch, searchStateChange }) => {
     const [inputActive, setInputActive] = useState(false)
     const [value, setValue] = useState('')
     let node = useRef(null)
+
     useEffect(() => {
         if (inputActive) {
-            // console.log(' node.current:', node.current)//input
             node.current.focus()
         }
         searchStateChange(inputActive)
     }, [inputActive])
+    // 系统菜单快捷键监听ctrl+p
+    useIpcRenderer({
+        'create-search-file': () => {
+            setInputActive(true)
+        }
+    })
     const closeSearch = () => {
         setInputActive(false)
         setValue('')
