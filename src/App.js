@@ -1,13 +1,14 @@
 import './App.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import SimpleMDE from 'react-simplemde-editor';
+import "easymde/dist/easymde.min.css";
 import { v4  } from 'uuid';
 import {
   faPlusSquare,
   faUpload
 } from '@fortawesome/free-solid-svg-icons';
-import "easymde/dist/easymde.min.css";
-import React, { useEffect,useState } from 'react';
+
+import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import FileSearch from "./components/FileSearch.js";
 import FileList from "./components/FileList.js";
@@ -15,6 +16,7 @@ import BottomBtn from "./components/BottomBtn.js";
 import TabList from "./components/TabList.js";
 import FileHelper from './utils/FileHelper.js';
 import useIpcRenderer from './hooks/useIpcRenderer.js';
+import useKeyPress from './hooks/useKeyPress.js'
 import {
   ObjToArr,
   returnTimes
@@ -28,9 +30,29 @@ const {
   app,
   dialog,
 } = remote
-const Store = window.require('electron-store');
-const store = new Store({'name': 'File Data'});
-const basePath = app.getPath('userData'); // basePath/notebook(项目名称)/File Data.json
+
+
+const Store = window.require('electron-store')
+const store = new Store({'name': 'File Data'})
+const settings = new Store({
+  'name': 'settings'
+});
+// const QiniuItem = require('./utils/QiniuItem')
+// const ak = '_2Cuwxy9KRWINmElmFXsoL5yzAiKsi-r2FnybKYY'
+// const sk = '837BJADHTydHJbMSdjHpQJMdQ286UAh5iJHalNzj'
+// const bucket = 'markdown-bx'
+// const domain = 'http://qmxdfsdr2.hd-bkt.clouddn.com/'
+// const qiniu = new QiniuItem(ak, sk, bucket)
+// qiniu.Download(domain, '321.md')
+// qiniu.Delfile('1212.md').catch(err=>{
+//   console.log(err);
+// })
+// console.log('qiniu', qiniu);
+// qiniu.Upload('1212.md', 'C:/Users/baixinL/AppData/Roaming/notebook/1212.md').catch (err => {
+//   console.log(err);
+// })
+// console.log(settings.get('defaultLocationUrl'));
+const basePath = settings.get('defaultLocationUrl') || app.getPath('userData'); // basePath/notebook(项目名称)/File Data.json
 const saveFilesToStore = (files) =>{
   const filesStoreObj = Object.values(files).reduce((result, file) => {
       const { id, filePath, title, createAt } = file
@@ -55,7 +77,7 @@ function App() {
   const [openedFileIds, setOpenedFileIds] = useState([])
   const [editingFileName, setEitingFileName] = useState(false)
 
-
+  const ctrlPressed = useKeyPress(17)
   // 1.new file
   const CreateFile = () => {
     if (editingFileName) {
@@ -107,6 +129,7 @@ function App() {
 
   //4. add unsavefile  (change file but unsave)
   const UpdateUnsaveFile = (id, newValue) => {
+    if (ctrlPressed) return
     const curFile = activeFile
     if (curFile.body === newValue) return
     const newFile = {
@@ -130,21 +153,23 @@ function App() {
         if (files[id].title === newValue) return // 没改
         const oldPath = newFile.filePath
         const newPath = oldPath ? path.join(path.dirname(oldPath), `${newValue}.md`) : path.join(basePath, `${newValue}.md`)
-        
+        //更新title，filePath
         newFile.filePath = newPath
         newFile.title = newValue
 
         const oldName = files[id].title
         if(oldName) {
+          // 旧文件--重命名
           FileHelper.renameSync(oldPath, newPath)
         } else {
-          // 新建的文件
+          // 新文件--写入新文件
           FileHelper.writeFileSync(newFile.filePath, newFile.body)
         }
       } else {
         // body
         if (files[id].body === newValue) return // 没改
         FileHelper.writeFileSync(newFile.filePath, newValue)
+        newFile.body = newValue
       }
       const newfiles = {
         ...files,
@@ -173,14 +198,12 @@ function App() {
   
   //6.save file 
  const SaveFile = () => {
-   console.log('save');
    if (!unSavedFiles[activeFileId]) return
+   
    const body = unSavedFiles[activeFileId].body
-   const {
-     [activeFileId]: delFile,
-     ...resUnsavedFiles
-   } = unSavedFiles
-   setUnSavedFiles(resUnsavedFiles)
+   let unSavedFiles_cp = { ...unSavedFiles }
+   delete unSavedFiles_cp[activeFileId]
+   setUnSavedFiles(unSavedFiles_cp)
    UpdateFile(activeFileId, 'body', body)
  }
   

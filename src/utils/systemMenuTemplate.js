@@ -1,12 +1,15 @@
-
+const {
+    app,
+    ipcMain
+} = require('electron')
 const isMac = process.platform === 'darwin'
-
+const name = app.getName()
 const template = [
     // { role: 'appMenu' }
     ...(isMac ? [{
-                label: 'Clouddoc',
+                label: name,
                 submenu: [{
-                        label: '关于Clouddoc',
+                        label: `关于${name}`,
                         role: 'about',
                             click: (menuItem, browserWindow, event) => {
 
@@ -14,6 +17,7 @@ const template = [
                     },
                     {
                         label: '设置',
+                        accelerator: 'Command+,',
                             click: (menuItem, browserWindow, event) => {
 
                             }
@@ -21,20 +25,34 @@ const template = [
                     {
                         type: '服务',
                         role: 'services',
+                        submenu: []
+                    },
+                    {
+                        label: `隐藏${name}`,
+                        role: 'hide',
+                         accelerator: 'Command+H',
                             click: (menuItem, browserWindow, event) => {
 
                             }
                     },
                     {
-                        label: '隐藏',
-                        role: 'hide',
-                            click: (menuItem, browserWindow, event) => {
+                        label: '隐藏其它',
+                        role: 'hideothers',
+                        accelerator: 'Command+Alt+H',
+                        click: (menuItem, browserWindow, event) => {
 
-                            }
+                        }
+                    },
+                    {
+                        label: '显示全部',
+                        role: 'unhide',
+                        click: (menuItem, browserWindow, event) => {
+
+                        }
                     },
                     {
                         label: '退出',
-                         role: isMac ? 'close' : 'quit',
+                         role: 'quit',
                              click: (menuItem, browserWindow, event) => {
 
                              }
@@ -54,12 +72,18 @@ const template = [
                 }
             },
             {
+                type: 'separator',
+            },
+            {
                 label: '保存',
                 role: '',
                 accelerator: 'CmdOrCtrl+S',
                     click: (menuItem, browserWindow, event) => {
                         browserWindow.webContents.send('create-saved-file')
                     }
+            },
+            {
+                type: 'separator',
             },
             {
                 label: '搜索',
@@ -70,6 +94,9 @@ const template = [
                     }
             },
             {
+                type: 'separator',
+            },
+            {
                 label: '导入',
                 role: '',
                 accelerator: 'CmdOrCtrl+I',
@@ -77,6 +104,17 @@ const template = [
                         browserWindow.webContents.send('create-import-file')
                     }
             },
+            ...(isMac ? []: [
+                {
+                    type: 'separator',
+                }, {
+                    label: '设置',
+                    accelerator: 'Ctrl+,',
+                    click: (menuItem, browserWindow, event) => {
+                        ipcMain.emit('set-location-url')
+                    }
+                }
+            ])
         ]
     },
     // { role: 'editMenu' }
@@ -97,9 +135,6 @@ const template = [
                     click: (menuItem, browserWindow, event) => {
 
                     }
-            },
-            {
-                type: 'separator',
             },
             {
                 
